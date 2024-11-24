@@ -1,0 +1,43 @@
+# SET VAR
+:local localBiznet
+:local gwBiznet
+:local localIndihome
+:local gwIndihome
+:local currentBiznetPeer
+:local currentIndihomePeer
+
+# ISI VAR DARI ALAMAT INTERFACE (REMOVE /32)
+:set localBiznet [:pick [/ip address get [find interface="DIAL-BIZNET"] address] 0 [:find [/ip address get [find interface="DIAL-BIZNET"] address] "/"]]
+:set gwBiznet [/ip address get [find interface="DIAL-BIZNET"] network]
+
+:set localIndihome [:pick [/ip address get [find interface="DIAL-INDIHOME"] address] 0 [:find [/ip address get [find interface="DIAL-INDIHOME"] address] "/"]]
+:set gwIndihome [/ip address get [find interface="DIAL-INDIHOME"] network]
+
+# AMBIL ALAMAT PEER SAAT INI BUAT COMPARE
+:set currentBiznetPeer [/ip ipsec peer get [find name="PTK-SASE-BIZNET"] local-address]
+:set currentIndihomePeer [/ip ipsec peer get [find name="PTK-SASE-INDIHOME"] local-address]
+
+# LOG CURRENT VALUES
+# :log info "ALAMAT BIZNET INTERFACE: $localBiznet"
+# :log info "ALAMAT BIZNET PEER: $currentBiznetPeer"
+# :log info "ALAMAT INDIHOME INTERFACE: $localIndihome"
+# :log info "ALAMAT INDIHOME PEER: $currentIndihomePeer"
+# :log info "ALAMAT LOCAL PEER BIZNET SAAT INI: $currentBiznetPeer"
+# :log info "ALAMAT LOCAL PEER INDIHOME SAAT INI: $currentIndihomePeer"
+
+# UPDATE LOCAL ADDRESS PEER JIKA IP BERBEDA
+:if ($localBiznet != $currentBiznetPeer) do={
+    :log info "***SCRIPT SASE*** UPDATE BIZNET PEER LOCAL-ADDRESS DARI $currentBiznetPeer KE $localBiznet"
+    /ip ipsec/peer/set PTK-SASE-BIZNET local-address=$localBiznet
+} else={
+    :log info "***SCRIPT SASE*** BIZNET PEER LOCAL ADDRESS SUDAH SESUAI. TIDAK ADA PERUBAHAN DILAKUKAN"
+}
+
+:if ($localIndihome != $currentIndihomePeer) do={
+    :log info "***SCRIPT SASE*** UPDATE INDIHOME PEER LOCAL-ADDRESS DARI $currentIndihomePeer KE $localIndihome"
+    /ip ipsec/peer/set PTK-SASE-INDIHOME local-address=$localIndihome
+} else={
+    :log info "***SCRIPT SASE*** INDIHOME PEER LOCAL ADDRESS SUDAH SESUAI. TIDAK ADA PERUBAHAN DILAKUKAN"
+}
+
+
