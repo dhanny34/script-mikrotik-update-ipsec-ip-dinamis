@@ -1,0 +1,78 @@
+# SET VAR
+:local localBiznet
+:local gwBiznet
+:local localIndihome
+:local gwIndihome
+:local currentBiznetPeer
+:local currentIndihomePeer
+:local scriptName "***SCRIPT SASE***"
+
+# ERROR HANDLING - CEK INTERFACE
+:if ([:len [/ip address find interface="DIAL-BIZNET"]] = 0) do={
+    :log error "$scriptName INTERFACE DIAL-BIZNET TIDAK DITEMUKAN"
+    :exit
+}
+:if ([:len [/ip address find interface="DIAL-INDIHOME"]] = 0) do={
+    :log error "$scriptName INTERFACE DIAL-INDIHOME TIDAK DITEMUKAN"
+    :exit
+}
+
+# ERROR HANDLING - CEK IPSEC PEER
+:if ([:len [/ip ipsec peer find name="PTK-SASE-BIZNET"]] = 0) do={
+    :log error "$scriptName IPSEC PEER PTK-SASE-BIZNET TIDAK DITEMUKAN"
+    :exit
+}
+:if ([:len [/ip ipsec peer find name="PTK-SASE-INDIHOME"]] = 0) do={
+    :log error "$scriptName IPSEC PEER PTK-SASE-INDIHOME TIDAK DITEMUKAN"
+    :exit
+}
+
+# ISI VAR DARI ALAMAT INTERFACE (REMOVE /32)
+:do {
+    :set localBiznet [:pick [/ip address get [find interface="DIAL-BIZNET"] address] 0 [:find [/ip address get [find interface="DIAL-BIZNET"] address] "/"]]
+    :set gwBiznet [/ip address get [find interface="DIAL-BIZNET"] network]
+} on-error={
+    :log error "$scriptName GAGAL MEMBACA ALAMAT INTERFACE DIAL-BIZNET"
+    :exit
+}
+
+:do {
+    :set localIndihome [:pick [/ip address get [find interface="DIAL-INDIHOME"] address] 0 [:find [/ip address get [find interface="DIAL-INDIHOME"] address] "/"]]
+    :set gwIndihome [/ip address get [find interface="DIAL-INDIHOME"] network]
+} on-error={
+    :log error "$scriptName GAGAL MEMBACA ALAMAT INTERFACE DIAL-INDIHOME"
+    :exit
+}
+
+# AMBIL ALAMAT PEER SAAT INI BUAT COMPARE
+:do {
+    :set currentBiznetPeer [/ip ipsec peer get [find name="PTK-SASE-BIZNET"] local-address]
+    :set currentIndihomePeer [/ip ipsec peer get [find name="PTK-SASE-INDIHOME"] local-address]
+} on-error={
+    :log error "$scriptName GAGAL MEMBACA ALAMAT PEER IPSEC"
+    :exit
+}
+
+# FUNCTION UNTUK UPDATE PEER
+:local updatePeer do={
+    :local isp $1
+    :local currentAddr $2
+    :local newAddr $3
+    :local peerName $4
+    
+    :if ($currentAddr != $newAddr) do={
+        :log info "$scriptName UPDATE $isp PEER LOCAL-ADDRESS DARI $currentAddr KE $newAddr"
+        :do {
+            /ip ipsec/peer/set $peerName local-address=$newAddr
+            :log info "$scriptName BERHASIL UPDATE $isp PEER LOCAL-ADDRESS"
+        } on-error={
+            :log error "$scriptName GAGAL UPDATE $isp PEER LOCAL-ADDRESS"
+        }
+    } else={
+        :log info "$scriptName $isp PEER LOCAL ADDRESS SUDAH SESUAI. TIDAK ADA PERUBAHAN DILAKUKAN"
+    }
+}
+
+# UPDATE LOCAL ADDRESS PEER JIKA IP BERBEDA
+$updatePeer "BIZNET" $currentBiznetPeer $localBiznet "PTK-SASE-BIZNET"
+$updatePeer "INDIHOME" $currentIndihomePeer $localIndihome "PTK-SASE-INDIHOME"
